@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { supabase } from '@/lib/supabaseClient'
+import { createClient } from '@supabase/supabase-js'
 import { useRouter } from 'next/navigation'
 import { syncUser } from '@/lib/syncUser'
 
@@ -20,6 +20,12 @@ export default function AdminPage() {
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [email, setEmail] = useState<string | null>(null)
 
+  // ✅ create client safely inside component
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  )
+
   useEffect(() => {
     const init = async () => {
       const { data } = await supabase.auth.getUser()
@@ -32,10 +38,8 @@ export default function AdminPage() {
 
       setEmail(authUser.email ?? null)
 
-      // ✅ auto sync
       await syncUser()
 
-      // ✅ check role
       const { data: currentUser } = await supabase
         .from('users')
         .select('role')
@@ -47,7 +51,6 @@ export default function AdminPage() {
         return
       }
 
-      // ✅ fetch users
       const { data: usersData } = await supabase
         .from('users')
         .select('*')
@@ -60,8 +63,7 @@ export default function AdminPage() {
   }, [router])
 
   const deleteUser = async (id: string) => {
-    const confirmDelete = confirm('Delete this user?')
-    if (!confirmDelete) return
+    if (!confirm('Delete this user?')) return
 
     try {
       setDeletingId(id)
@@ -80,9 +82,9 @@ export default function AdminPage() {
         body: JSON.stringify({ id }),
       })
 
-      if (!res.ok) return
-
-      setUsers((prev) => prev.filter((u) => u.id !== id))
+      if (res.ok) {
+        setUsers((prev) => prev.filter((u) => u.id !== id))
+      }
     } finally {
       setDeletingId(null)
     }
